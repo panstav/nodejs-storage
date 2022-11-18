@@ -20,7 +20,6 @@ import {
   Bucket,
   DownloadOptions,
   DownloadResponse,
-  Storage,
   UploadOptions,
 } from '../src';
 import {performance} from 'perf_hooks';
@@ -37,6 +36,9 @@ import {
   getValidationType,
   performanceTestSetup,
   TestResult,
+  generateRandomFileName,
+  generateRandomFile,
+  cleanupFile,
 } from './performanceUtils';
 import {TRANSFER_MANAGER_TEST_TYPES} from './performanceTest';
 
@@ -84,9 +86,9 @@ async function main() {
     case TRANSFER_MANAGER_TEST_TYPES.APPLICATION_DOWNLOAD_MULTIPLE_OBJECTS:
       result = await performReadTest();
       break;
-    // case TRANSFER_MANAGER_TEST_TYPES.APPLICATION_LARGE_FILE_DOWNLOAD:
-    //   result = await performLargeReadTest();
-    //   break;
+    case TRANSFER_MANAGER_TEST_TYPES.APPLICATION_LARGE_FILE_DOWNLOAD:
+      result = await performLargeReadTest();
+      break;
     default:
       break;
   }
@@ -190,6 +192,46 @@ async function performReadTest(): Promise<TestResult> {
   };
 
   rmSync(TEST_NAME_STRING, {recursive: true, force: true});
+  await bucket.deleteFiles(); //cleanup
+  return result;
+}
+
+/**
+ * Performs an iteration of the read large object test.
+ *
+ * @returns {Promise<TestResult>} Promise that resolves to a test result for the iteration.
+ */
+ async function performLargeReadTest(): Promise<TestResult> {
+  await bucket.deleteFiles(); // start clean
+  const fileName = generateRandomFileName(TEST_NAME_STRING);
+  const sizeInBytes = generateRandomFile(
+    fileName,
+    argv.small,
+    argv.large,
+    __dirname
+  );
+  const file = bucket.file(`${fileName}`);
+
+  await bucket.upload(`${__dirname}/${fileName}`);
+  cleanupFile(fileName);
+
+  const start = performance.now();
+  await file.download();
+  const end = performance.now();
+
+  const result: TestResult = {
+    op: 'READ',
+    objectSize: sizeInBytes,
+    appBufferSize: BLOCK_SIZE_IN_BYTES,
+    libBufferSize: NODE_DEFAULT_HIGHWATER_MARK_BYTES,
+    crc32Enabled: false,
+    md5Enabled: false,
+    apiName: 'JSON',
+    elapsedTimeUs: Math.round((end - start) * 1000),
+    cpuTimeUs: -1,
+    status: '[OK]',
+  };
+
   await bucket.deleteFiles(); //cleanup
   return result;
 }
