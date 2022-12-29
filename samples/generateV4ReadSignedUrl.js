@@ -44,7 +44,7 @@ function main(bucketName = 'my-bucket', fileName = 'test.txt') {
     const options = {
       version: 'v4',
       action: 'read',
-      expires: Date.now() + 15 * 60 * 1000, // 15 minutes
+      expires: Date.now().getTime() + 15 * 60 * 1000, // 15 minutes
     };
 
     // Get a v4 signed URL for reading the file
